@@ -1,0 +1,11 @@
+[Project]
+category = Development
+maintainer = Jonathan Villemaire-Krajden
+appname = PySide app
+section = development
+pyversion = 2.6
+project = n9-trigger
+template = harmattan
+email = email@example.com
+desc = A PySide example
+
