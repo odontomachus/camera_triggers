@@ -1,19 +1,22 @@
 #!/usr/bin/python
 
-import sys
-
-from PySide import QtGui
-from PySide import QtDeclarative
 import os
+import sys
+import time
 
-# Comment the line below if you don't want to use OpenGL for QML rendering or if it is not supported
-from PySide import QtOpenGL
+from PySide import (\
+    QtCore, \
+    QtGui, \
+    QtDeclarative, \
+    QtOpenGL, \
+    )
 
 #20:13:09:03:14:01
 import dbus
 
-class BTReader:
+class BTCamera(QtCore.QObject):
     def __init__(self):
+        QtCore.QObject.__init__(self)
         self.address = "20:13:09:03:14:01"
         self.service = "spp"
         self.bus = dbus.SystemBus()
@@ -22,6 +25,7 @@ class BTReader:
         self.adapter = dbus.Interface(self.bus.get_object("org.bluez", manager.DefaultAdapter()), \
                                  "org.bluez.Adapter")
     
+#    @QtCore.Slot()
     def connect(self):
         path = self.adapter.FindDevice(self.address)
         object = self.bus.get_object("org.bluez", path)
@@ -32,7 +36,13 @@ class BTReader:
         #if properties['Trusted'] != dbus.Boolean(1): sys.exit(1)
         self.node = self.serial.Connect(self.service)
         self.pipe = open(self.node, 'r+')
-        return self.pipe
+
+    @QtCore.Slot()
+    def picture(self):
+        try:
+            self.pipe.write("P\n")
+        except Error:
+            pass
     
     def disconnect(self):
         self.serial.Disconnect(self.node)
@@ -47,6 +57,12 @@ def main():
     glw = QtOpenGL.QGLWidget()
     view.setViewport(glw)
 
+    bt = BTCamera()
+    bt.connect()
+
+    rc = view.rootContext()
+    rc.setContextProperty('bt', bt)
+
     if os.path.exists('/usr/share/n9-trigger/qml'):
         view.setSource('/usr/share/n9-trigger/qml/main.qml')
     else:
@@ -54,6 +70,8 @@ def main():
 
     view.showFullScreen()
     app.exec_()
+    bt.disconnect()
+
 
 if __name__ == "__main__":
     main()
