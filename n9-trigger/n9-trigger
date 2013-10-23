@@ -37,11 +37,22 @@ class BTCamera(QtCore.QObject):
         self.node = self.serial.Connect(self.service)
         self.pipe = open(self.node, 'r+')
 
-    @QtCore.Slot()
-    def picture(self):
+    @QtCore.Slot(str, str)
+    def picture(self, number=1, delay=0):
         try:
+            number = int(number)
+            delay = int(delay)
+        except Exception as e:
+            number = 1
+            delay = 0
+        try:
+            time.sleep(delay)
             self.pipe.write("P\n")
-        except Error:
+            if number>1:
+                for i in range(number):
+                    time.sleep(1)
+                    self.pipe.write("P\n")
+        except Exception as e:
             pass
     
     def disconnect(self):

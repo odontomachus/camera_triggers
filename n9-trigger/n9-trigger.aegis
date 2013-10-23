@@ -1,0 +1,7 @@
+<aegis>
+  <request>
+    <!-- Needs access to /dev/rfcomm* -->
+    <credential name="GRP::dialout" />
+    <for path="/home/user/apps/n9-trigger/n9-trigger" />
+  </request>       
+</aegis>
