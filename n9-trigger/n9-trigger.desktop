@@ -2,7 +2,7 @@
 Encoding=UTF-8
 Version=1.0
 Type=Application
-Name=PySide app
+Name=N9 Trigger
 Exec=invoker --single-instance --type=e /usr/bin/n9-trigger
 Icon=/usr/share/icons/hicolor/64x64/apps/n9-trigger.png
 Categories=Development;

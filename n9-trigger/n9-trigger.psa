@@ -6,6 +6,6 @@ section = development
 pyversion = 2.6
 project = n9-trigger
 template = harmattan
-email = email@example.com
-desc = A PySide example
+email = odontomachus@gmail.com
+desc = A remote trigger for a bluetooth trigger module.
 
