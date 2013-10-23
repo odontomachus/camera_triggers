@@ -16,24 +16,24 @@ class BTReader:
     def __init__(self):
         self.address = "20:13:09:03:14:01"
         self.service = "spp"
-
         self.bus = dbus.SystemBus()
-        manager = dbus.Interface(self.bus.get_object("org.bluez", "/"),
+        manager = dbus.Interface(self.bus.get_object("org.bluez", "/"), \
                                  "org.bluez.Manager")
-
-        self.adapter = dbus.Interface(self.bus.get_object("org.bluez", manager.DefaultAdapter()),
+        self.adapter = dbus.Interface(self.bus.get_object("org.bluez", manager.DefaultAdapter()), \
                                  "org.bluez.Adapter")
-
+    
     def connect(self):
-        path = self.adapter.FindDevice(address)
-        self.serial = dbus.Interface(self.bus.get_object("org.bluez", path),
+        path = self.adapter.FindDevice(self.address)
+        object = self.bus.get_object("org.bluez", path)
+        self.serial = dbus.Interface(object, \
                         "org.bluez.Serial")
-
-        self.node = self.serial.Connect(self.service)
-        properties = self.node.GetProperties()
+        #properties = object.GetProperties()
         # Ensure device is trusted
-        if properties['Trusted'] != dbus.Boolean(1): sys.exit(1)
-
+        #if properties['Trusted'] != dbus.Boolean(1): sys.exit(1)
+        self.node = self.serial.Connect(self.service)
+        self.pipe = open(self.node, 'r+')
+        return self.pipe
+    
     def disconnect(self):
         self.serial.Disconnect(self.node)
 
