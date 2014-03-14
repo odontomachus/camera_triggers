@@ -1,76 +1,114 @@
+#include "rf.h"
+#include "comm.h"
+
 #include <stdlib.h>
-
 #define F_CPU 1000000UL  // 1 MHz
+
+#include <avr/io.h>
 #include <util/delay.h>
-#include <avr/interrupt.h>
-#include "trigger.h"
 
-#define PIN_TRIGG PB3
-#define PIN_FOCUS PB4
-#define PIN_EMITT PB0
+#define PIN_PHOTO PB4
+#define PIN_FOCUS PB2
 
-uint8_t status;
+#define STATE_WAITING 0
+#define STATE_INIT 1
+#define STATE_READY 2
+#define STATE_RECV 3
 
-ISR(PCINT0_vect) {
-    int i;
-    status = PINB;
+typedef struct {
+    uint8_t comm;
+    uint8_t last;
+    uint8_t status;
+    uint8_t count;
+    uint8_t position;
+    uint8_t data;
+} state_t;
 
-    // trigger
-    if (status) {
-        // Initialize
-        for (i=1;i<21;i++) {
-            // Leading digit 
-            if (i%2) {
-                PORTB |= 1<<PIN_EMITT;
-            }
-            else {
-                PORTB &= ~(1<<PIN_EMITT);
-            }
-            _delay_us(SAMPLE_TIME+JITTER);
-        }
-        PORTB |= 1<<PIN_EMITT;
-        _delay_us(7*SAMPLE_TIME+JITTER);
-        PORTB &= ~(1<<PIN_EMITT);
-        _delay_us(2*SAMPLE_TIME+JITTER);
-        
-        if ((1<<PIN_TRIGG)&status) {
-            // Repeat 3 times to make sure it gets it.
-            for (i=0;i<48;i++) {
-                // Leading digit 
-                if (TRIGG<<(i%16) & 0x8000) {
-                    PORTB |= 1<<PIN_EMITT;
-                }
-                else {
-                    PORTB &= ~(1<<PIN_EMITT);
-                }
-                _delay_us(5*SAMPLE_TIME);
+/**
+ * Analyze latest received sample.
+ */
+void receive(&state) {
+    // run for DATA*2 flips, counting duration
+    if (state.comm^state.last) { // switch
+        state.last = state.comm;
+        if (position%2 == 1) {
+            state.data <<= 1;
+            if (count <= 9) {// short
+                state.data += 1;
             }
         }
-        else if ((1<<PIN_FOCUS)&status) {
-            for (i=0;i<48;i++) {
-                // Leading digit 
-                if (FOCUS<<(i%16) & 0x8000) {
-                    PORTB |= 1<<PIN_EMITT;
-                }
-                else {
-                    PORTB &= ~(1<<PIN_EMITT);
-                }
-                _delay_us(5*SAMPLE_TIME);
+        if (position==16) {
+            // Done receiving
+            if (state.data == photo) {
+                PORTB |= (1<<PIN_PHOTO);
+                _delay_ms(140);
+                PORTB &= ~(1<<PINPHOTO);
             }
+            state.position = 0;
+            state.count = 0;
+            state.status = STATE_WAITING;
+            state.comm = 0;
+            state.last = 0;
+            state.data = 0;
+            }
+        else {
+            state.position++;
+            state.count = 0;
         }
-        // No repeats for 300ms
-        PORTB &= ~(1<<PIN_EMITT);
-        _delay_ms(300);
+    }
+    if (state.comm) {
+        state.count++;
     }
 
 }
 
-int main () {
-    cli();
-    DDRB = 1<<PIN_EMITT;
-    GIMSK = 1<<PCIE;
-    PCMSK = (1<<3)|(1<<4);
-    sei();
-    while (1);
-    return 0;
+
+void main() {
+    state_t state = {0};
+    DDRB |= (1<<PIN_COMM);
+    while (1) {
+        state.comm = PINB & (1<<PIN_COMM);
+        switch (state.status) {
+        // DEFAULT
+        case STATE_WAITING:
+            if (state.comm) {
+                state.count = 1;
+                state.status = STATE_INIT;
+            }
+            break;
+        // LONG ON
+        case STATE_INIT:
+            if (state.comm) {
+                state.count++;
+                if (state.count > 64) {
+                    state.count = 0;
+                    state.status = STATE_WAITING;
+                }
+            }
+            else {
+                if (state.count > 30) {
+                    state.count = 0;
+                    state.status = STATE_RECV;
+                }
+            }
+            break;
+        case STATE_READY:
+            if (state.comm) {
+                state.status = STATE_RECV;
+                state.count = 1;
+                state.data = 0;
+            }
+            else {
+                state.count++;
+                if (state.count > 8) {
+                    state.count = 0;
+                    state.status = STATE_WAITING;
+                }
+                break;
+            }
+        case STATE_RECV:
+            receive(&state);
+            break;
+        }
+    }
 }
