@@ -2,10 +2,10 @@
 
 all: trigger remote
 
-trigger.out: trigger.c
+trigger.out: trigger.c trigger.h
 	avr-gcc -mmcu=attiny85 -Os trigger.c -o trigger.out
 
-remote.out: remote.c
+remote.out: remote.c trigger.h
 	avr-gcc -mmcu=attiny85 -Os remote.c -o remote.out
 
 trigger: trigger.out
@@ -18,7 +18,7 @@ write_trigger: trigger
 	avrdude -p t85 -P usb -c DRAGON_ISP -U flash:w:trigger.hex
 
 write_remote: remote
-	avrdude -p t85 -P usb -c DRAGON_ISP -U flash:w:remote.hex
+	avrdude -p t85 -P /dev/ttyACM0 -c avrispv2 -U flash:w:remote.hex
 
 clean:
 	rm *.out
