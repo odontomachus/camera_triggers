@@ -4,21 +4,20 @@
 #include <avr/io.h>
 #include <util/delay.h>
 
-#define BAUDRATE 9600
-#define BAUD_PRESCALLER (((F_CPU / (BAUDRATE * 16UL))) - 1)
+#define BAUDRATE 4800
 
-#define PIN_TRIGGER PB2
-#define PIN_FOCUS PB3
+#define PIN_TRIGGER PB3
+#define PIN_FOCUS PB2
 #define PIN_TRIGGER_LED PD3
 #define PIN_FOCUS_LED PD4
 
 
 unsigned int ubrr;
 
-void USART_Init( unsigned long baud )
+void USART_Init()
 {
     /* Set baud rate (using u2x=1 doubles effective baud rate) */
-    ubrr = (unsigned long) (F_CPU/8/baud) - 1;
+    ubrr = (unsigned long) (F_CPU/16/BAUDRATE) - 1;
     UBRRH = (unsigned char) ubrr>>8;
     UBRRL = (unsigned char) ubrr;
     /* Enable receiver and transmitter */
@@ -27,9 +26,8 @@ void USART_Init( unsigned long baud )
      * 8 bit data (UCSZ2:0 = 0b011) 
      * 1 stop bit (USBS = 0) 
      * Async. op (UMSEL = 0) 
-     * Odd parity (UPM1:0 = 0b11)*/ 
-    UCSRC = (3<<UCSZ0)|(3<<UPM0);
-    UCSRA = 1<<U2X; // Double speed
+     * No parity (UPM1:0 = 0b00)*/
+    UCSRC = (3<<UCSZ0);
 }
 
 void USART_Transmit( unsigned char data )
@@ -59,36 +57,34 @@ void USART_Flush( void )
 int main () {
     unsigned char message;
     DDRD |= (1<<PIN_FOCUS_LED)|(1<<PIN_TRIGGER_LED);
-    PORTD |= (1<<PIN_FOCUS_LED)|(1<<PIN_TRIGGER_LED);
-    DDRB = 0;
+    DDRB |= (1<<PIN_FOCUS_LED)|(1<<PIN_TRIGGER_LED);
     USART_Init(9600);
     // Give the bluetooth time to boot...
+    PORTD |= (1<<PIN_FOCUS_LED)|(1<<PIN_TRIGGER_LED);
     _delay_ms(1500);
+    USART_Transmit(*"C");
+    USART_Transmit(*":");
     USART_Transmit(*"O");
-    _delay_ms(15);
     USART_Transmit(*"K");
-    _delay_ms(200);
+    _delay_ms(20);
     PORTD &= ~((1<<PIN_FOCUS_LED)|(1<<PIN_TRIGGER_LED));
     while (1) {
         message = USART_Receive();
         if (message == *"P") {
             PORTD |= 1<<PIN_TRIGGER_LED;
-            DDRB |= 1<<PIN_TRIGGER;
+            PORTB |= 1<<PIN_TRIGGER;
             _delay_ms(200);
-            DDRB &= ~(1<<PIN_TRIGGER);
+            PORTB &= ~(1<<PIN_TRIGGER);
             PORTD &= ~(1<<PIN_TRIGGER_LED);
-            USART_Flush();
         }
         if (message == *"F") {
             PORTD |= 1<<PIN_FOCUS_LED;
-            DDRB |= 1<<PIN_FOCUS;
-            ~((1<<PIN_FOCUS)|(1<<PIN_FOCUS));
-            _delay_ms(50);
+            PORTB |= 1<<PIN_FOCUS;
+            _delay_ms(20);
         }
         else {
-            DDRB &= ~(1<<PIN_FOCUS);
+            PORTB &= ~(1<<PIN_FOCUS);
             PORTD &= ~(1<<PIN_FOCUS_LED);
-            USART_Flush();
         }
         _delay_ms(1);
 
