@@ -2,6 +2,8 @@
 
 #include <stdlib.h>
 #include <avr/io.h>
+#include <avr/interrupt.h>
+#include "trigger.h"
 
 #define F_CPU 1000000UL  // 1 MHz
 #include <util/delay.h>
@@ -22,6 +24,10 @@
 #define RCV_LONG 2
 
 //@TODO timed release using interrupts
+ISR(TIM1_OVF_vect) {
+  release();
+}
+
 
 uint8_t count() {
   uint8_t count = 0;
@@ -50,24 +56,34 @@ uint8_t interpret(uint8_t count) {
 void photo() {
   // Set pin to output (ground it)
   // Set focus pin too to make sure camera is awake (focus pin is live
-  // during sleep)
+  // during camera sleep)
   DDRB |= (1<<PIN_FOCUS|1<<PIN_PHOTO);
-  PORTB |= 1<<PIN_LIGHT;
-  _delay_ms(10);
-  DDRB &= ~(1<<PIN_FOCUS);
-  _delay_ms(90);
-  DDRB &= ~(1<<PIN_PHOTO);
-  PORTB &= ~(1<<PIN_LIGHT|1<<PIN_PHOTO);
+  release_timer_on();
 }
 
 void focus() {
   DDRB |= (1<<PIN_FOCUS);
+  release_timer_on();
 }
 
 void release() {
+  // Release photo and focus pins
   DDRB &= ~(1<<PIN_FOCUS|1<<PIN_PHOTO);
+  release_timer_off();
 }
 
+// Setup release countdown
+void release_timer_on() {
+  // set timer source to ck/16384 (1Mhz/16k -> 16.384ms/tick)
+  // ovf @256 -> 4.194s/ovf
+  TCNT1 = 0;
+  TCCR1 |= 0b1111<<CS10;
+}
+
+void release_timer_off() {
+  // Unset timer1 source
+  TCCR1 &= ~(0b1111<<CS10);
+}
 
 /**
  * Analyze latest received sample.
@@ -87,14 +103,16 @@ void listen() {
       bits++;
     }
     if (bits == 8) {
-      if (byte == MESSAGE_PHOTO) {
+      switch (byte) {
+      case MESSAGE_PHOTO:
         photo();
-      }
-      else if (byte == MESSAGE_FOCUS) {
+        break;
+      case MESSAGE_FOCUS:
         focus();
-      }
-      else {
+        break;
+      case MESSAGE_RELEASE:
         release();
+        break;
       }
     }
   }
@@ -103,10 +121,12 @@ void listen() {
 
 void main() {
   // Pins set to input (high resistance)
-  _delay_ms(100);
+  _delay_ms(10);
   DDRB |= 1<<PIN_LIGHT;
   PORTB |= 1<<PIN_LIGHT;
-  _delay_ms(900);
+  _delay_ms(500);
   PORTB ^= 1<<PIN_LIGHT;
+  TIMSK |= (1<<TOIE1);
+  sei();
   listen();  
 }

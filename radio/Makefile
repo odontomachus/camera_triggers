@@ -2,10 +2,10 @@
 
 all: trigger remote
 
-trigger.out: trigger.c trigger.h
+trigger.out: trigger.c rf.h
 	avr-gcc -mmcu=attiny85 -Os trigger.c -o trigger.out
 
-remote.out: remote.c trigger.h
+remote.out: remote.c rf.h
 	avr-gcc -mmcu=attiny85 -Os remote.c -o remote.out
 
 trigger: trigger.out

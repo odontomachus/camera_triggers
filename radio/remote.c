@@ -36,53 +36,61 @@ void send(uint8_t byte) {
   }
 }
 
-//@TODO interrupt.
+void timer_on() {
+  // Every 256/1000 of a second
+  TCNT1 = 0;
+  TCCR1 |= 0b1011<<CS10;
+}
+
+void timer_off() {
+  // Unset timer1 source
+  TCCR1 &= ~(0b1111<<CS10);
+}
+
+// Interrupt on button change or timer overflow
 ISR(PCINT0_vect) {
   // ~PINB to get falling edge since using pull-up.
   uint8_t status = ~PINB;
-  PORTB |= 1<<PIN_LIGHT;
   if (status & (1<<PIN_BUTTON_PHOTO)) {
+    PORTB |= 1<<PIN_LIGHT;
     send(MESSAGE_PHOTO);
-    PORTB ^= 1<<PIN_LIGHT;
+    timer_on();
   }
-  // Trigger on rising edge since photo transistor on by default.
-  // @TODO Fix this, triggers on release of other buttons now.
-  // @solution: detect if it's low at start time and setup only in that situation.
-  /* else if (~status & (1<<PIN_BUTTON_LASER)) */
-  /*   send(MESSAGE_PHOTO); */
   else if (status & (1<<PIN_BUTTON_FOCUS)) {
     send(MESSAGE_FOCUS);
-    // Check if released during message transmission
-    uint8_t status = PINB;
-    if (status & (1<<PIN_BUTTON_FOCUS)) {
-      send(MESSAGE_RELEASE);
-    }
+    timer_on();
   }
-  // Release
-  else {
+  // Release on rising edge or if released during send
+  status = ~PINB;
+  if (!(status & (1<<PIN_BUTTON_PHOTO|1<<PIN_BUTTON_FOCUS))) {
+    
+    PORTB &= ~(1<<PIN_LIGHT);
     send(MESSAGE_RELEASE);
+    timer_off();
   }
 }
-
+ISR(TIM1_OVF_vect, ISR_ALIASOF(PCINT0_vect));
 
 void main() {
   // Let time for voltage to stabilize
   DDRB |= 1<<PIN_COMM | 1<<PIN_LIGHT;
   PORTB |= 1<<PIN_LIGHT;
-  _delay_ms(500);
+  _delay_ms(200);
   PORTB ^= 1<<PIN_LIGHT;
   // Set pull-up
   PORTB |= (1<<PIN_BUTTON_FOCUS)|(1<<PIN_BUTTON_PHOTO);
   // Setup interrupts for button presses.
   PCMSK |= (1<<PIN_BUTTON_FOCUS)|(1<<PIN_BUTTON_PHOTO);
   GIMSK |= (1<<PCIE);
+  // Enable timer1 overflow interrupt
+  TIMSK |= 1<<TOIE1;
+
   sei();
   while (1) {
     // Toggle pin every PULSE ms to keep active carrier signal.
     PORTB |= 1<<PIN_COMM;
     _delay_ms(PULSE);
-    PORTB &= ~(1<<PIN_COMM|1<<PIN_LIGHT);
+    PORTB &= ~(1<<PIN_COMM);
     _delay_ms(30);
-    send(MESSAGE_RELEASE);
   }
 }
