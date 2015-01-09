@@ -91,31 +91,34 @@ void release_timer_off() {
  * Analyze latest received sample.
  */
 void listen() {
-  uint8_t bit, bits, byte;
-  bit = bits = byte = 0;
+  uint8_t bit, nobits, byte;
+  bit = nobits = byte = 0;
   while (1) {
     bit = interpret(count());
     if (!bit) {
-      byte = bits = 0;
+      nobits++;
+    }
+    // Too many failures, reset
+    if (nobits == 2) {
+      nobits = byte = 0;
+      continue;
     }
     else {
+      byte >>=1;
       if (bit == RCV_SHORT) {
-        byte |= 1<<bits;
+        byte |= 1<<7;
       }
-      bits++;
     }
-    if (bits == 8) {
-      switch (byte) {
-      case MESSAGE_PHOTO:
-        photo();
-        break;
-      case MESSAGE_FOCUS:
-        focus();
-        break;
-      case MESSAGE_RELEASE:
-        release();
-        break;
-      }
+    switch (byte) {
+    case MESSAGE_PHOTO:
+      photo();
+      break;
+    case MESSAGE_FOCUS:
+      focus();
+      break;
+    case MESSAGE_RELEASE:
+      release();
+      break;
     }
   }
 }
