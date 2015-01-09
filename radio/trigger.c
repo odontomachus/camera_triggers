@@ -58,6 +58,7 @@ void photo() {
   // Set focus pin too to make sure camera is awake (focus pin is live
   // during camera sleep)
   DDRB |= (1<<PIN_FOCUS|1<<PIN_PHOTO);
+  PORTB |= 1<<PIN_LIGHT;
   release_timer_on();
 }
 
@@ -69,6 +70,7 @@ void focus() {
 void release() {
   // Release photo and focus pins
   DDRB &= ~(1<<PIN_FOCUS|1<<PIN_PHOTO);
+  PORTB &= ~(1<<PIN_LIGHT);
   release_timer_off();
 }
 

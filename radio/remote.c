@@ -50,21 +50,26 @@ void timer_off() {
 // Interrupt on button change or timer overflow
 ISR(PCINT0_vect) {
   // ~PINB to get falling edge since using pull-up.
-  uint8_t status = ~PINB;
-  if (status & (1<<PIN_BUTTON_PHOTO)) {
+  // Except laser button since it is high on standby.
+  uint8_t status = (~PINB)^(1<<PIN_BUTTON_LASER);
+  if (status & (1<<PIN_BUTTON_PHOTO | 1<<PIN_BUTTON_LASER)) {
     PORTB |= 1<<PIN_LIGHT;
+    send(MESSAGE_PHOTO);
     send(MESSAGE_PHOTO);
     timer_on();
   }
   else if (status & (1<<PIN_BUTTON_FOCUS)) {
     send(MESSAGE_FOCUS);
+    send(MESSAGE_FOCUS);
     timer_on();
   }
   // Release on rising edge or if released during send
-  status = ~PINB;
+  status = ~PINB^(1<<PIN_BUTTON_LASER);
   if (!(status & (1<<PIN_BUTTON_PHOTO|1<<PIN_BUTTON_FOCUS))) {
     
     PORTB &= ~(1<<PIN_LIGHT);
+    send(MESSAGE_RELEASE);
+    send(MESSAGE_RELEASE);
     send(MESSAGE_RELEASE);
     timer_off();
   }
@@ -78,9 +83,9 @@ void main() {
   _delay_ms(200);
   PORTB ^= 1<<PIN_LIGHT;
   // Set pull-up
-  PORTB |= (1<<PIN_BUTTON_FOCUS)|(1<<PIN_BUTTON_PHOTO);
+  PORTB |= (1<<PIN_BUTTON_FOCUS)|(1<<PIN_BUTTON_PHOTO)|(1<<PIN_BUTTON_LASER);
   // Setup interrupts for button presses.
-  PCMSK |= (1<<PIN_BUTTON_FOCUS)|(1<<PIN_BUTTON_PHOTO);
+  PCMSK |= (1<<PIN_BUTTON_FOCUS)|(1<<PIN_BUTTON_PHOTO)|(1<<PIN_BUTTON_LASER);
   GIMSK |= (1<<PCIE);
   // Enable timer1 overflow interrupt
   TIMSK |= 1<<TOIE1;
